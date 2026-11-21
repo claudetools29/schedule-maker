@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Schedule</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1C120C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Schedule">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#1C120C; --card:#2B1D14; --line:#4A3425; --muted:#B9A58F; --accent:#D9A66C; --tan:#D9B98C;
+  --ui-bg:#120B07; --ui-panel:#1C120C; --ui-field:#2B1D14; --ui-text:#F3E9DC;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ui-bg);color:var(--ui-text);font-family:Helvetica,Arial,sans-serif}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+body{overflow:hidden}
+.toolbar{flex:none;display:flex;flex-wrap:wrap;gap:10px 12px;align-items:flex-end;padding:12px 16px;background:var(--ui-panel);border-bottom:1px solid var(--line);position:relative;z-index:30}
+.tf{display:flex;flex-direction:column;gap:3px;min-width:0;position:relative}
+.tf.grow{flex:1 1 150px}
+.tf>label{font-size:10.5px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.tf input,.tf select{padding:7px 9px;font-size:13px}
+.tf select{width:92px}
+.tf button{padding:8px 12px;white-space:nowrap}
+.toolbar button.primary{width:auto;margin:0;padding:8px 16px;font-size:14px}
+.pop{position:absolute;top:calc(100% + 8px);left:0;width:440px;max-width:92vw;max-height:72vh;overflow:auto;z-index:50;background:var(--ui-panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.65)}
+.pop[hidden]{display:none}
+.main{flex:1;min-height:0;display:flex;gap:16px;padding:16px}
+.blocks{width:360px;flex:none;overflow-y:auto;background:var(--ui-panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.blocks .rows{margin-top:0}
+input,select{width:100%;background:var(--ui-field);border:1px solid var(--line);color:var(--ui-text);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.rows{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.row{background:var(--ui-field);border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;position:relative}
+.row.break{border-style:dashed;background:transparent}
+.row .head{grid-column:1 / -1;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.handle{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;font-size:20px;line-height:1;padding:2px 8px;border-radius:8px;color:var(--tan);letter-spacing:-2px}
+.handle:hover{background:#3a281b}
+.dragging{z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.6);cursor:grabbing!important}
+.row.dragging{background:#3a281b}
+.row .name{grid-column:1 / -1}
+.row .tools{grid-column:1 / -1;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row small{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ui-text);border-radius:10px;padding:7px 11px;cursor:pointer}
+button:hover{background:#3a281b}
+button.primary{background:var(--accent);border-color:var(--accent);color:#1C120C;font-weight:700;font-size:15px;padding:12px 16px;width:100%;margin-top:16px}
+button.primary:hover{background:#e6b57c}
+.cgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 12px}
+.cgrid label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);line-height:1.25}
+input[type=color]{padding:2px;height:34px;cursor:pointer;width:100%}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.preview{flex:1;min-width:0;min-height:0;overflow:auto;scrollbar-gutter:stable;padding-bottom:12px}
+.stage{flex:none;margin:0 auto;overflow:hidden;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.tip{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.5}
+.tip.edit{margin:0 0 12px;color:var(--tan)}
+
+/* ---------- the poster (all sizes in pt) ---------- */
+.page{position:relative;width:var(--W);height:var(--H);background:var(--p-bg);overflow:hidden;
+  font-family:Helvetica,Arial,sans-serif;color:var(--p-txt);transform-origin:0 0;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.glows{position:absolute;inset:0}
+.title{color:var(--p-title);position:absolute;left:38pt;top:51pt;font-size:58pt;font-weight:700;line-height:1;white-space:nowrap}
+.sub{position:absolute;left:40pt;top:116pt;font-size:14pt;font-weight:700;line-height:1;color:var(--p-sub);letter-spacing:4pt;word-spacing:3pt;text-transform:uppercase;white-space:nowrap}
+.tag{position:absolute;right:38pt;top:119.5pt;font-size:10pt;line-height:1;color:var(--p-muted);text-transform:uppercase;white-space:nowrap}
+.rule{position:absolute;left:38pt;right:38pt;top:146pt;height:1pt;background:var(--p-line)}
+.list{position:absolute;left:38pt;right:38pt;top:166pt;bottom:40pt;display:flex;flex-direction:column;gap:11pt}
+.card{flex:1;min-height:0;background:var(--p-card);border-radius:calc(16pt*var(--k));position:relative;overflow:hidden;display:flex;align-items:center}
+.tb{width:118pt;height:100%;flex:none;background:var(--p-acc18);border-left:7pt solid var(--p-acc);padding-left:15pt;display:flex;flex-direction:column;justify-content:center}
+.st{font-size:calc(25pt*var(--k));font-weight:700;line-height:1;white-space:nowrap}
+.st b{font-size:calc(11pt*var(--k));color:var(--p-acc);margin-left:2pt}
+.en{font-size:calc(10.5pt*var(--k));color:var(--p-muted);margin-top:calc(9pt*var(--k));line-height:1;white-space:nowrap}
+.nm{flex:1;min-width:0;padding:0 14pt 0 26pt;font-size:calc(28pt*var(--k));font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{cursor:grab;user-select:none;-webkit-user-select:none}
+@media screen{.card .nm,.card .st,.card .en{cursor:text;border-radius:4pt}.card .nm:hover,.card .st:hover,.card .en:hover{outline:1pt dashed var(--p-acc);outline-offset:2pt}}
+.page input.inl{font:inherit;color:inherit;letter-spacing:inherit;text-transform:none;background:rgba(255,255,255,.1);border:0;border-bottom:1.5pt solid var(--p-acc);border-radius:3pt;outline:none;padding:0 3pt;margin:0;height:auto;width:100%;min-width:0;user-select:text;-webkit-user-select:text;cursor:text}
+.st input.inl{width:92pt}.en input.inl{width:64pt}.brk .st input.inl{width:70pt}
+.brk{flex:.45;background:transparent;border:1.4pt dashed var(--p-brk);border-radius:calc(12pt*var(--k))}
+.brk .tb{background:transparent;border-left:0;padding-left:21pt}
+.brk .st{font-size:calc(15pt*var(--k));color:var(--p-brkt)}
+.brk .st b{font-size:calc(8pt*var(--k));color:var(--p-brkt)}
+.brk .en{font-size:calc(8.5pt*var(--k));margin-top:calc(4pt*var(--k))}
+.brk .nm{font-size:calc(15pt*var(--k));letter-spacing:.25em;text-transform:uppercase;color:var(--p-brkt);padding-left:26pt}
+.brk .du{background:none;padding:0;margin-right:24pt;color:var(--p-muted);font-size:calc(11pt*var(--k))}
+.du{flex:none;margin-right:20pt;height:calc(26pt*var(--k));padding:0 calc(13pt*var(--k));border-radius:13pt;background:var(--p-acc20);color:var(--p-acc);font-size:calc(12pt*var(--k));font-weight:700;display:flex;align-items:center;white-space:nowrap}
+
+@media (max-width:900px){body{overflow:auto}.app{height:auto}.main{flex-direction:column;padding:12px}.blocks{width:100%;overflow:visible}.preview{order:-1;height:auto;overflow:visible}.pop{width:92vw}.cgrid{grid-template-columns:1fr 1fr}}
+@media print{
+  html,body{background:var(--p-bg)!important}
+  .toolbar,.blocks{display:none!important}
+  body{overflow:visible}
+  .app{display:block;height:auto;padding:0;margin:0;max-width:none}
+  .main{display:block;padding:0}
+  .preview{display:block;height:auto;overflow:visible}
+  .stage{width:auto!important;height:auto!important;box-shadow:none;border-radius:0;overflow:visible}
+  .page{transform:none!important}
+  .card{cursor:auto}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+<style id="pagesize">@page{size:595.28pt 841.89pt;margin:0}</style>
+</head>
+<body>
+<div class="app">
+  <header class="toolbar">
+    <div class="tf grow"><label for="title">Title</label><input id="title" value="MY DAY"></div>
+    <div class="tf grow"><label for="sub">Subtitle</label><input id="sub" value="Daily Schedule"></div>
+    <div class="tf grow"><label for="tag">Small line</label><input id="tag" value="Make every hour count"></div>
+    <div class="tf"><label for="paper">Paper</label>
+      <select id="paper"><option value="a4">A4</option><option value="letter">Letter</option><option value="a3">A3</option></select></div>
+    <div class="tf"><label for="zoom">Zoom</label>
+      <select id="zoom"><option value="fit">Fit width</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></div>
+    <div class="tf"><label>Style</label><button id="colorsBtn" aria-expanded="false">Colors ▾</button>
+      <div class="pop" id="colorsPop" hidden>
+        <div class="cgrid" id="cgrid"></div>
+        <div class="actions"><button id="resetColors">Reset colors</button></div>
+      </div></div>
+    <div class="tf"><label>Blocks</label><div class="actions" style="margin:0"><button id="add">+ Add block</button><button id="sort">Sort by time</button><button id="reset">Reset all</button></div></div>
+    <div class="tf"><label>File</label><div class="actions" style="margin:0"><button id="export" title="Download this schedule as a .json file">Export</button><button id="import" title="Load a schedule from a .json file">Import</button></div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden></div>
+    <div class="tf"><label>Output</label><div class="actions" style="margin:0"><button class="primary" id="pdf">Save as PDF</button><button id="print">Print</button></div></div>
+  </header>
+  <div class="main">
+    <aside class="blocks">
+      <div class="tip edit">Tip: click any <b>time</b> or <b>name</b> on the poster to edit it (type 4:30pm or 16:30, then Enter). Drag a block to move it.</div>
+      <div class="rows" id="rows"></div>
+      <div class="tip"><b>Save as PDF</b> downloads a PDF file directly. <b>Print</b> opens your printer dialog: set <b>Margins: None</b>, turn <b>Background graphics</b> on and keep scale at 100%. <b>Export / Import</b> saves and loads your schedule as a small file.</div>
+    </aside>
+    <div class="preview" id="preview"><div class="stage" id="stage"><div class="page" id="page"></div></div></div>
+  </div>
+</div>
+
+<script>
+const SIZES={a4:[595.28,841.89],letter:[612,792],a3:[841.89,1190.55]};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const DEFAULT_RAW=[
+ ["00:00","06:30","Sleep"],["08:00","15:30","Go to school"],["16:30","17:30","Lunch"],
+ ["17:30","18:30","Homework"],["19:00","20:00","Study Subject 1"],["20:00","20:30","Study Subject 2"],["21:00","23:00","Gym"]
+];
+const defaultRows=()=>DEFAULT_RAW.map(([s,e,n])=>({id:uid(),type:"block",s,e,n}));
+const THEME_FIELDS=[
+ ["bg","Background"],["glow","Corner glow"],["glow2","Soft glow"],["title","Title"],["sub","Subtitle"],["muted","Small text"],
+ ["line","Divider line"],
+ ["card","Block cards"],["acc","Accent (side bar, AM/PM, duration)"],["txt","Activity & time text"],["brk","Break outline"],["brkt","Break text"]
+];
+const DEF_THEME={bg:"#1C120C",glow:"#8A5A34",glow2:"#C9996A",title:"#FFFFFF",sub:"#D9B98C",muted:"#B9A58F",line:"#4A3425",
+  card:"#2B1D14",acc:"#D9A66C",txt:"#FFFFFF",brk:"#6E4F39",brkt:"#D9B98C"};
+const KEY="schedule-maker-v2";
+let state={title:"MY DAY",sub:"Daily Schedule",tag:"Make every hour count",paper:"a4",rows:defaultRows()};
+try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw);if(o&&Array.isArray(o.rows))state=Object.assign(state,o)}}catch(e){}
+state.theme=Object.assign({},DEF_THEME,state.theme||{});
+state.rows.forEach(r=>{if(!r.id)r.id=uid();if(!r.type)r.type="block"});
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function parse(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?[+m[1],+m[2]]:[0,0]}
+function parseTimeText(txt,prev){
+  const m=/^\s*(\d{1,2})(?:[:.]?(\d{2}))?\s*([ap])?\.?m?\.?\s*$/i.exec(txt);
+  if(!m)return null;
+  let h=+m[1];const min=m[2]?+m[2]:0;const ap=m[3]?m[3].toLowerCase():null;
+  if(min>59||h>24)return null;
+  if(ap){if(h<1||h>12)return null;h=h%12+(ap==="p"?12:0)}
+  else if(h===0){h=0}
+  else if(h<=12){const pm=parse(prev)[0]>=12;h=h===12?(pm?12:0):h+(pm?12:0)}
+  else if(h===24)h=0;
+  if(h>23)return null;
+  return String(h).padStart(2,"0")+":"+String(min).padStart(2,"0");
+}
+function timeText(t){const f=fmt(t);return f.t+" "+f.ap}
+function openEdit(card,target){
+  const row=state.rows.find(r=>r.id===card.dataset.uid);if(!row)return;
+  let field,el;
+  if(target.closest(".nm")){field="n";el=card.querySelector(".nm")}
+  else if(target.closest(".st")){field="s";el=card.querySelector(".st")}
+  else if(target.closest(".en")){field="e";el=card.querySelector(".en")}
+  else return;
+  const inp=document.createElement("input");
+  inp.className="inl";inp.type="text";inp.value=field==="n"?row.n:timeText(row[field]);
+  el.textContent="";if(field==="e")el.append("to ");el.append(inp);
+  let done=false;
+  const commit=ok=>{
+    if(done)return;done=true;
+    if(ok){
+      if(field==="n")row.n=inp.value.trim();
+      else{const t=parseTimeText(inp.value,row[field]);if(t)row[field]=t}
+    }
+    renderEditor();update();
+  };
+  inp.addEventListener("blur",()=>commit(true));
+  inp.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();commit(true)}else if(ev.key==="Escape"){ev.preventDefault();commit(false)}});
+  setTimeout(()=>{inp.focus();inp.select()},0);
+}
+function fmt(t){const [h,m]=parse(t);const h12=h%12||12;return {t:m?`${h12}:${String(m).padStart(2,"0")}`:`${h12}`,ap:h<12?"AM":"PM"}}
+function dur(s,e){const a=parse(s),b=parse(e);let d=(b[0]*60+b[1])-(a[0]*60+a[1]);if(d<=0)d+=1440;const h=Math.floor(d/60),m=d%60;return [h?h+"h":"",m?m+"m":""].filter(Boolean).join(" ")}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+
+function rgb(h){const m=/^#?([0-9a-f]{6})$/i.exec(h||"");const n=parseInt(m?m[1]:"000000",16);return [(n>>16)&255,(n>>8)&255,n&255]}
+function hex(a){return "#"+a.map(v=>Math.round(v).toString(16).padStart(2,"0")).join("")}
+function mix(a,b,t){const x=rgb(a),y=rgb(b);return hex(x.map((v,i)=>v+(y[i]-v)*t))}
+function applyTheme(){
+  const t=state.theme,r=document.documentElement.style,a=rgb(t.acc).join(",");
+  const m={bg:t.bg,card:t.card,muted:t.muted,line:t.line,acc:t.acc,sub:t.sub,title:t.title,txt:t.txt,brk:t.brk,brkt:t.brkt};
+  for(const k in m)r.setProperty("--p-"+k,m[k]);
+  r.setProperty("--p-acc18",`rgba(${a},.18)`);r.setProperty("--p-acc20",`rgba(${a},.2)`);
+}
+function glow(x,y,r,rgb,a){return `radial-gradient(circle ${r}pt at ${x} ${y}, rgba(${rgb},${a}) 0%, rgba(${rgb},0) 100%)`}
+
+function renderPage(){
+  const [W,H]=SIZES[state.paper]||SIZES.a4;
+  applyTheme();
+  const page=$("page");
+  page.style.setProperty("--W",W+"pt");page.style.setProperty("--H",(H-0.5)+"pt");
+  $("pagesize").textContent=`@page{size:${W}pt ${H}pt;margin:0}`;
+  const n=Math.max(state.rows.length,1);
+  const units=Math.max(state.rows.filter(r=>r.type!=="break").length+0.45*state.rows.filter(r=>r.type==="break").length,1);
+  const listH=(H-166-40)-11*(n-1);
+  const rh=listH/units;
+  const k=Math.max(0.3,Math.min(1,rh/82));
+  page.style.setProperty("--k",k.toFixed(3));
+  const glows=[
+    glow("0","0",330,rgb(state.theme.glow).join(","),.5),
+    glow("100%","60pt",240,rgb(state.theme.glow2).join(","),.4),
+    glow("100%","100%",330,rgb(state.theme.glow).join(","),.5),
+    glow("0","calc(100% - 40pt)",220,rgb(state.theme.glow2).join(","),.35)
+  ].join(",");
+  const cards=state.rows.map(r=>{
+    const a=fmt(r.s),b=fmt(r.e);
+    return `<div class="card${r.type==="break"?" brk":""}" data-uid="${r.id}"><div class="tb"><div class="st">${a.t}<b>${a.ap}</b></div><div class="en">to ${b.t} ${b.ap}</div></div>
+      <div class="nm">${esc(r.n)}</div><div class="du">${dur(r.s,r.e)}</div></div>`}).join("");
+  page.innerHTML=`<div class="glows" style="background:${glows}"></div>
+    <div class="title">${esc(state.title)}</div>
+    <div class="sub">${esc(state.sub)}</div>
+    <div class="tag">${esc(state.tag)}</div>
+    <div class="rule"></div>
+    <div class="list">${cards}</div>`;
+  fit();
+}
+function fit(){
+  const page=$("page"),stage=$("stage");
+  const cs=getComputedStyle(page);
+  const pw=page.offsetWidth,ph=page.offsetHeight; // px
+  const pv=$("preview"),narrow=matchMedia("(max-width:900px)").matches;
+  const aw=Math.max(200,(pv.clientWidth||pw)-12);
+  const z=state.zoom||"fit";
+  const sc=Math.max(0.1,z==="fit"?Math.min(narrow?1:1.8,aw/pw):(+z)/100);
+  page.style.transform=`scale(${sc})`;
+  stage.style.width=pw*sc+"px";stage.style.height=ph*sc+"px";
+}
+
+function renderColors(){
+  $("cgrid").innerHTML=THEME_FIELDS.map(([k,l])=>`<label>${l}<input type="color" data-theme="${k}" value="${state.theme[k]}"></label>`).join("");
+}
+function renderEditor(){
+  renderColors();
+  $("title").value=state.title;$("sub").value=state.sub;$("tag").value=state.tag;$("paper").value=state.paper;$("zoom").value=state.zoom||"fit";
+  const box=$("rows");box.innerHTML="";
+  state.rows.forEach((r,i)=>{
+    const d=document.createElement("div");d.className="row";
+    const brk=r.type==="break";
+    d.className="row"+(brk?" break":"");d.dataset.uid=r.id;
+    d.innerHTML=`<div class="head"><span class="handle" title="Drag to reorder">⠿⠿</span><span>${brk?"Break":"Block"}</span></div>
+      <div><small>Start</small><input type="time" value="${esc(r.s)}" data-i="${i}" data-k="s"></div>
+      <div><small>End</small><input type="time" value="${esc(r.e)}" data-i="${i}" data-k="e"></div>
+      <div class="name"><small>${brk?"Label":"Activity"}</small><input type="text" value="${esc(r.n)}" data-i="${i}" data-k="n" placeholder="${brk?"e.g. Break":"e.g. Homework"}"></div>
+      <div class="tools"><button data-act="brk" data-i="${i}">+ Break after</button><button data-act="up" data-i="${i}">↑</button><button data-act="down" data-i="${i}">↓</button><button data-act="del" data-i="${i}">Remove</button></div>`;
+    box.appendChild(d);
+  });
+}
+function update(){save();renderPage()}
+
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.theme){state.theme[t.dataset.theme]=t.value;update();return}
+  if(t.dataset&&t.dataset.k){state.rows[+t.dataset.i][t.dataset.k]=t.value;update();return}
+  if(t.id==="title"){state.title=t.value;update()}
+  if(t.id==="sub"){state.sub=t.value;update()}
+  if(t.id==="tag"){state.tag=t.value;update()}
+  if(t.id==="paper"){state.paper=t.value;update()}
+  if(t.id==="zoom"){state.zoom=t.value;save();fit()}
+});
+$("rows").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const i=+b.dataset.i,a=b.dataset.act,r=state.rows;
+  if(a==="del")r.splice(i,1);
+  if(a==="brk"){const st=r[i].e;const [h,m]=parse(st);const t=(h*60+m+15)%1440;
+    r.splice(i+1,0,{id:uid(),type:"break",s:st,e:String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"),n:"Break"})}
+  if(a==="up"&&i>0)[r[i-1],r[i]]=[r[i],r[i-1]];
+  if(a==="down"&&i<r.length-1)[r[i+1],r[i]]=[r[i],r[i+1]];
+  renderEditor();update();
+});
+$("add").onclick=()=>{
+  const last=state.rows[state.rows.length-1];
+  const st=last?last.e:"09:00";const h=(parse(st)[0]+1)%24;
+  state.rows.push({id:uid(),type:"block",s:st,e:String(h).padStart(2,"0")+":"+String(parse(st)[1]).padStart(2,"0"),n:""});
+  renderEditor();update();
+};
+$("sort").onclick=()=>{state.rows.sort((a,b)=>a.s.localeCompare(b.s));renderEditor();update()};
+$("reset").onclick=()=>{if(confirm("Reset everything to the example schedule?")){state={title:"MY DAY",sub:"Daily Schedule",tag:"Make every hour count",paper:"a4",rows:defaultRows(),theme:Object.assign({},DEF_THEME)};renderEditor();update()}};
+$("resetColors").onclick=()=>{state.theme=Object.assign({},DEF_THEME);renderColors();update()};
+$("print").onclick=()=>window.print();
+
+/* ---------- Export / Import schedule (.json) ---------- */
+function download(blob,name){
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function fileBase(){return (state.title||"schedule").trim().replace(/[^\w\- ]+/g,"").replace(/\s+/g,"-").toLowerCase()||"schedule"}
+$("export").onclick=()=>{
+  const data={app:"schedule-maker",version:2,title:state.title,sub:state.sub,tag:state.tag,paper:state.paper,theme:state.theme,
+    rows:state.rows.map(({type,s,e,n})=>({type,s,e,n}))};
+  download(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),fileBase()+".json");
+};
+$("import").onclick=()=>$("importFile").click();
+$("importFile").addEventListener("change",e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  const rd=new FileReader();
+  rd.onerror=()=>alert("Could not read that file.");
+  rd.onload=()=>{
+    let o;try{o=JSON.parse(rd.result)}catch(x){alert("That file isn't a valid schedule file.");return}
+    if(!o||!Array.isArray(o.rows)){alert("That file isn't a valid schedule file.");return}
+    const okT=t=>/^\d{1,2}:\d{2}$/.test(t||"");
+    const rows=o.rows.filter(r=>r&&okT(r.s)&&okT(r.e)).map(r=>({
+      id:uid(),type:r.type==="break"?"break":"block",
+      s:String(r.s).padStart(5,"0"),e:String(r.e).padStart(5,"0"),n:String(r.n==null?"":r.n)}));
+    if(!rows.length){alert("No valid time blocks found in that file.");return}
+    if(!confirm("Replace the current schedule with \""+f.name+"\"?"))return;
+    state={title:String(o.title==null?"":o.title),sub:String(o.sub==null?"":o.sub),tag:String(o.tag==null?"":o.tag),
+      paper:SIZES[o.paper]?o.paper:"a4",zoom:state.zoom,rows,
+      theme:Object.assign({},DEF_THEME,o.theme&&typeof o.theme==="object"?o.theme:{})};
+    renderEditor();update();
+  };
+  rd.readAsText(f);
+});
+
+/* ---------- Save as PDF (direct download, no print dialog) ---------- */
+function pageToCanvas(scale){
+  return new Promise((resolve,reject)=>{
+    const page=$("page"),W=page.offsetWidth,H=page.offsetHeight;
+    let css="";
+    for(const sh of document.styleSheets){try{for(const r of sh.cssRules)css+=r.cssText+"\n"}catch(x){}}
+    const NS="http://www.w3.org/1999/xhtml";
+    const wrap=document.createElementNS(NS,"div");
+    wrap.setAttribute("style",document.documentElement.getAttribute("style")||"");
+    const st=document.createElementNS(NS,"style");st.textContent=css;wrap.appendChild(st);
+    const clone=page.cloneNode(true);clone.style.transform="none";wrap.appendChild(clone);
+    const xml=new XMLSerializer().serializeToString(wrap);
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${xml}</foreignObject></svg>`;
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const [pw,ph]=SIZES[state.paper]||SIZES.a4;
+        const c=document.createElement("canvas");
+        c.width=Math.round(pw*4/3*scale);c.height=Math.round(ph*4/3*scale);
+        const g=c.getContext("2d");
+        g.fillStyle=state.theme.bg;g.fillRect(0,0,c.width,c.height);
+        g.drawImage(img,0,0,W*scale,H*scale);
+        c.toDataURL("image/jpeg",.5); // throws if the canvas is tainted
+        resolve(c);
+      }catch(err){reject(err)}
+    };
+    img.onerror=()=>reject(new Error("render failed"));
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+  });
+}
+function jpegToPdf(canvas,wPt,hPt){
+  const b64=canvas.toDataURL("image/jpeg",.95).split(",")[1];
+  const bin=atob(b64),jpg=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)jpg[i]=bin.charCodeAt(i);
+  const enc=new TextEncoder(),parts=[],offs=[];let len=0;
+  const push=d=>{const u=typeof d==="string"?enc.encode(d):d;parts.push(u);len+=u.length};
+  const obj=(n,body)=>{offs[n]=len;push(n+" 0 obj\n"+body+"\nendobj\n")};
+  push("%PDF-1.4\n");
+  obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2,"<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+  obj(3,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${wPt} ${hPt}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+  offs[4]=len;
+  push(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`);
+  push(jpg);push("\nendstream\nendobj\n");
+  const cs=`q ${wPt} 0 0 ${hPt} 0 0 cm /Im0 Do Q`;
+  obj(5,`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
+  const xref=len;
+  let x="xref\n0 6\n0000000000 65535 f \n";
+  for(let i=1;i<=5;i++)x+=String(offs[i]).padStart(10,"0")+" 00000 n \n";
+  push(x+`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parts,{type:"application/pdf"});
+}
+$("pdf").onclick=async()=>{
+  const btn=$("pdf"),label=btn.textContent;
+  btn.disabled=true;btn.textContent="Making PDF…";
+  try{
+    const [pw,ph]=SIZES[state.paper]||SIZES.a4;
+    const canvas=await pageToCanvas(3);
+    download(jpegToPdf(canvas,pw.toFixed(2),ph.toFixed(2)),fileBase()+".pdf");
+  }catch(err){
+    if(confirm("Your browser blocked the direct PDF download.\n\nOpen the print dialog instead? Choose \"Save as PDF\" there."))window.print();
+  }
+  btn.disabled=false;btn.textContent=label;
+};
+function startDrag(e,item,container,getScale){
+  e.preventDefault();
+  const sc=getScale();
+  const kids=()=>[...container.children].filter(x=>x.dataset&&x.dataset.uid);
+  const r0=item.getBoundingClientRect();
+  const grab=e.clientY-r0.top;
+  item.classList.add("dragging");
+  const move=ev=>{
+    const y=ev.clientY;
+    const sp=container.closest(".blocks");
+    if(sp){const sr=sp.getBoundingClientRect();if(y<sr.top+50)sp.scrollTop-=14;else if(y>sr.bottom-50)sp.scrollTop+=14}
+    else if(y<70)window.scrollBy(0,-14);else if(y>innerHeight-70)window.scrollBy(0,14);
+    item.style.transform="none";
+    const center=y-grab+r0.height/2;
+    const others=kids().filter(x=>x!==item);
+    let idx=0;
+    others.forEach(o=>{const r=o.getBoundingClientRect();if(r.top+r.height/2<center)idx++});
+    if(idx!==kids().indexOf(item))container.insertBefore(item,others[idx]||null);
+    const nat=item.getBoundingClientRect().top;
+    item.style.transform=`translateY(${(y-grab-nat)/sc}px)`;
+  };
+  const up=()=>{
+    window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
+    item.style.transform="";item.classList.remove("dragging");
+    const order=kids().map(x=>x.dataset.uid);
+    const map=Object.fromEntries(state.rows.map(r=>[r.id,r]));
+    state.rows=order.map(id=>map[id]).filter(Boolean);
+    renderEditor();update();
+  };
+  window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up);
+}
+document.addEventListener("pointerdown",e=>{
+  if(e.button!==0)return;
+  const h=e.target.closest(".handle");
+  if(h){const row=h.closest(".row");startDrag(e,row,$("rows"),()=>1);return}
+  const card=e.target.closest("#page .card");
+  if(card&&e.pointerType!=="touch"){
+    if(e.target.closest("input"))return;
+    const page=$("page");const sc=page.getBoundingClientRect().width/page.offsetWidth||1;
+    const sx=e.clientX,sy=e.clientY,tgt=e.target;let dragging=false;
+    const clean=()=>{window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",upc);window.removeEventListener("pointercancel",upc)};
+    const mv=ev=>{if(!dragging&&Math.hypot(ev.clientX-sx,ev.clientY-sy)>5){dragging=true;clean();startDrag(e,card,card.parentElement,()=>sc)}};
+    const upc=()=>{clean();if(!dragging)openEdit(card,tgt)};
+    window.addEventListener("pointermove",mv);window.addEventListener("pointerup",upc);window.addEventListener("pointercancel",upc);
+  }
+});
+window.addEventListener("resize",fit);
+if(window.ResizeObserver)new ResizeObserver(()=>fit()).observe($("preview"));
+(function(){
+  const btn=$("colorsBtn"),pop=$("colorsPop");
+  const close=()=>{pop.hidden=true;btn.setAttribute("aria-expanded","false")};
+  btn.addEventListener("click",e=>{
+    e.stopPropagation();
+    if(!pop.hidden){close();return}
+    pop.hidden=false;btn.setAttribute("aria-expanded","true");
+    pop.style.left="0";pop.style.right="auto";
+    const r=pop.getBoundingClientRect();
+    if(r.right>innerWidth-8){pop.style.left="auto";pop.style.right="0"}
+  });
+  document.addEventListener("pointerdown",e=>{if(!pop.hidden&&!e.target.closest("#colorsPop")&&e.target!==btn)close()});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!pop.hidden)close()});
+})();
+window.addEventListener("beforeprint",()=>{$("page").style.transform="none"});
+window.addEventListener("afterprint",fit);
+renderEditor();renderPage();
+</script>
+<script>if("serviceWorker" in navigator&&location.protocol.startsWith("http")){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}</script>
+</body>
+</html>
